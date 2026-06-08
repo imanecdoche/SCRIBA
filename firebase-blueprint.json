@@ -1,0 +1,165 @@
+{
+  "entities": {
+    "project": {
+      "title": "Project",
+      "description": "Informasi metadata novel dan sinopsis.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "synopsis": { "type": "string" },
+        "author": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "createdAt", "updatedAt"]
+    },
+    "chapter": {
+      "title": "Chapter",
+      "description": "Draf bab novel beserta isinya.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "number": { "type": "number" },
+        "isProlog": { "type": "boolean" },
+        "isEpilog": { "type": "boolean" },
+        "summary": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "projectId", "userId", "title", "content", "number", "isProlog", "isEpilog", "createdAt"]
+    },
+    "character": {
+      "title": "CharacterItem",
+      "description": "Karakter cerita beserta ringkasan visual dan kepribadian fiksi.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "description": { "type": "string" },
+        "backstory": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "aiProfile": {
+          "type": "object",
+          "properties": {
+            "usia": { "type": "string" },
+            "tinggi": { "type": "string" },
+            "gender": { "type": "string" },
+            "peranNarasi": { "type": "string" },
+            "jabatanCerita": { "type": "string" },
+            "hubunganKarakter": { "type": "string" },
+            "deskripsiFisik": { "type": "string" },
+            "sifatKarakter": { "type": "string" }
+          }
+        }
+      },
+      "required": ["id", "projectId", "userId", "name", "role", "createdAt"]
+    },
+    "worldItem": {
+      "title": "WorldItem",
+      "description": "Data world-building dari elemen hukum, aturan fiksi, geografi, dll.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "aiProfile": {
+          "type": "object",
+          "properties": {
+            "definisi": { "type": "string" },
+            "cakupan": { "type": "string" },
+            "aturanUtama": { "type": "string" },
+            "sejarah": { "type": "string" },
+            "hubunganCerita": { "type": "string" }
+          }
+        }
+      },
+      "required": ["id", "projectId", "userId", "name", "category", "createdAt"]
+    },
+    "plotHole": {
+      "title": "PlotHole",
+      "description": "Masalah inkonsistensi plot cerita yang terdeteksi secara otomatis atau manual.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "severity": { "type": "string" },
+        "status": { "type": "string" },
+        "chapterIds": { "type": "array" },
+        "characterIds": { "type": "array" },
+        "detectedByGemini": { "type": "boolean" },
+        "suggestions": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "projectId", "userId", "title", "description", "severity", "status", "detectedByGemini", "createdAt"]
+    },
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "Catatan singkat profil pengguna atau sesi masuk log.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "lastActive": { "type": "string" }
+      },
+      "required": ["email", "lastActive"]
+    },
+    "appSettings": {
+      "title": "AppSettings",
+      "description": "Pengaturan global aplikasi.",
+      "type": "object",
+      "properties": {
+        "appLogo": { "type": "string" },
+        "appTitle": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["appLogo", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "project",
+      "description": "Projek novel milik pengguna."
+    },
+    "/chapters/{chapterId}": {
+      "schema": "chapter",
+      "description": "Bab-bab dari projek novel."
+    },
+    "/characters/{characterId}": {
+      "schema": "character",
+      "description": "Karakter-karakter dalam projek."
+    },
+    "/worldItems/{itemId}": {
+      "schema": "worldItem",
+      "description": "Elemen dunia / lore dari projek."
+    },
+    "/plotHoles/{plotHoleId}": {
+      "schema": "plotHole",
+      "description": "Daftar plot hole dari projek."
+    },
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "Dokumen profil user."
+    },
+    "/appSettings/{settingsId}": {
+      "schema": "appSettings",
+      "description": "Pengaturan master global."
+    }
+  }
+}

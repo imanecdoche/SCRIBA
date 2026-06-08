@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny Catch-all Security Rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Checking authentication status
+    function isSignedIn() { 
+      return request.auth != null; 
+    }
+
+    // Checking ownership of the document
+    function isOwner(data) {
+      return data != null && data.userId == request.auth.uid;
+    }
+
+    // Admin bypass check for kazokuhairy@gmail.com
+    function isRecoveryAdmin() {
+      return isSignedIn() && (
+        request.auth.uid == "t3g4oN5oPIaL2i2Hrc69LcVhiIi1" || 
+        (request.auth.token != null && 
+         request.auth.token.get('email', '') == "kazokuhairy@gmail.com")
+      );
+    }
+
+    match /projects/{projectId} {
+      allow read: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin());
+      allow write: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin()) && (request.resource == null || isOwner(request.resource.data) || isRecoveryAdmin());
+    }
+
+    match /chapters/{chapterId} {
+      allow read: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin());
+      allow write: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin()) && (request.resource == null || isOwner(request.resource.data) || isRecoveryAdmin());
+    }
+
+    match /characters/{characterId} {
+      allow read: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin());
+      allow write: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin()) && (request.resource == null || isOwner(request.resource.data) || isRecoveryAdmin());
+    }
+
+    match /worldItems/{itemId} {
+      allow read: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin());
+      allow write: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin()) && (request.resource == null || isOwner(request.resource.data) || isRecoveryAdmin());
+    }
+
+    match /plotHoles/{plotHoleId} {
+      allow read: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin());
+      allow write: if isSignedIn() && (resource == null || isOwner(resource.data) || isRecoveryAdmin()) && (request.resource == null || isOwner(request.resource.data) || isRecoveryAdmin());
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isRecoveryAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isRecoveryAdmin());
+    }
+
+    match /appSettings/{settingsId} {
+      allow read: if true;
+      allow write: if isRecoveryAdmin();
+    }
+  }
+}

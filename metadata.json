@@ -1,0 +1,6 @@
+{
+  "name": "Novel Workspace",
+  "description": "Minimalist novel project workspace with character bibles, world-building records, chapter outlines, and smart plot hole analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
