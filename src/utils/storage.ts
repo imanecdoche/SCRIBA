@@ -576,7 +576,15 @@ export const storage = {
     return storage.getAllCharacters().filter(c => c.projectId === projectId);
   },
 
-  addCharacter: (projectId: string, name: string, role: string, description: string, backstory: string, notes: string): CharacterItem => {
+  addCharacter: (
+    projectId: string,
+    name: string,
+    role: string,
+    description: string,
+    backstory: string,
+    notes: string,
+    aiProfile?: CharacterItem['aiProfile']
+  ): CharacterItem => {
     const all = storage.getAllCharacters();
     const newItem: CharacterItem = {
       id: generateId(),
@@ -586,6 +594,7 @@ export const storage = {
       description,
       backstory,
       notes,
+      aiProfile,
       createdAt: new Date().toISOString()
     };
     all.push(newItem);
@@ -641,7 +650,14 @@ export const storage = {
     return storage.getAllWorldItems().filter(w => w.projectId === projectId);
   },
 
-  addWorldItem: (projectId: string, name: string, category: string, description: string, notes: string): WorldItem => {
+  addWorldItem: (
+    projectId: string,
+    name: string,
+    category: string,
+    description: string,
+    notes: string,
+    aiProfile?: WorldItem['aiProfile']
+  ): WorldItem => {
     const all = storage.getAllWorldItems();
     const newItem: WorldItem = {
       id: generateId(),
@@ -650,6 +666,7 @@ export const storage = {
       category,
       description,
       notes,
+      aiProfile,
       createdAt: new Date().toISOString()
     };
     all.push(newItem);

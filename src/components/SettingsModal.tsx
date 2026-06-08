@@ -17,15 +17,6 @@ interface SettingsModalProps {
 
 export const CHANGELOG_DATA: ChangelogItem[] = [
   {
-    version: '2.1.0',
-    date: '07 Juni 2026',
-    changes: [
-      'Vercel Deployment Ready: Mereformasi server backend Express menjadi modul mandiri /server-app.ts dengan memisahkan instansiasi rute API dari setup listener.',
-      'Serverless Routing API: Menambah berkas gerbang serverless fungsi /api/index.ts dan pemetaan vercel.json agar seluruh rute proxy Gemini AI berjalan otomatis di Vercel tanpa perlu setup container.',
-      'Fleksibilitas Konfigurasi Firebase: Mengintegrasikan deteksi prioritas variabel lingkungan VITE_FIREBASE_* (import.meta.env) sehingga memudahkan pengaturan basis data Firestore dan Otentikasi mandiri di luar ekosistem AI Studio.'
-    ]
-  },
-  {
     version: '2.0.9',
     date: '07 Juni 2026',
     changes: [

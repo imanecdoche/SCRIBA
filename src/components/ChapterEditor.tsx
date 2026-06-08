@@ -4,7 +4,7 @@ import { Chapter, Project } from '../types';
 import { storage, capitalizeWords } from '../utils/storage';
 import { 
   Plus, Trash2, Edit3, Bold, Italic, BookOpen, Save, FileText, 
-  ChevronRight, ArrowLeft, Eye, Edit, HelpCircle, Copy, Scissors
+  ChevronRight, ArrowLeft, Eye, Edit, HelpCircle, Copy, Scissors, X
 } from 'lucide-react';
 import AppConfirmationModal from './AppConfirmationModal';
 
@@ -17,10 +17,16 @@ interface ChapterEditorProps {
 export default function ChapterEditor({ projectId, chapters, onRefresh }: ChapterEditorProps) {
   // Navigation states: 
   // 'dashboard' - shows project metadata info and list of chapter cards
-  // 'project-metadata' - separate module to edit project metadata
+  // 'project-metadata' - separate module to edit project metadata (fallback / legacy)
   // 'editor' - dedicated chapter writing canvas (Chapter Editor)
   const [activeSubView, setActiveSubView] = useState<'dashboard' | 'project-metadata' | 'editor'>('dashboard');
+  const [isAnalyzingNewBible, setIsAnalyzingNewBible] = useState(false);
+  const [detectedNotify, setDetectedNotify] = useState<{
+    characters: string[];
+    worldItems: string[];
+  } | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
 
   // Load and manage Project synopsis/metadata state
   const project = storage.getProjects().find((p) => p.id === projectId);
@@ -37,15 +43,15 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
   const pGenres = project?.genres;
   const pSynopsis = project?.synopsis;
 
-  // Sync temp state with active project when entering project-metadata view
+  // Sync temp state with active project when entering project-metadata view or opening metadata modal
   useEffect(() => {
-    if (activeSubView === 'project-metadata') {
+    if (showMetadataModal || activeSubView === 'project-metadata') {
       setTempTitle(pTitle || '');
       setTempAuthor(pAuthor || '');
       setTempGenres(pGenres || '');
       setTempSynopsis(pSynopsis || '');
     }
-  }, [activeSubView, pTitle, pAuthor, pGenres, pSynopsis]);
+  }, [showMetadataModal, activeSubView, pTitle, pAuthor, pGenres, pSynopsis]);
 
   // For adding a new chapter
   const [showAddModal, setShowAddModal] = useState(false);
@@ -74,6 +80,22 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
 
   // Confirmation Delete modal state
   const [deleteChapterId, setDeleteChapterId] = useState<string | null>(null);
+
+  // Context Menu State for Chapter Cards
+  const [chapterContextMenu, setChapterContextMenu] = useState<{ x: number; y: number; chapterId: string } | null>(null);
+  const [copiedChapterId, setCopiedChapterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleCloseChapterMenu = () => {
+      setChapterContextMenu(null);
+    };
+    window.addEventListener('click', handleCloseChapterMenu);
+    window.addEventListener('contextmenu', handleCloseChapterMenu);
+    return () => {
+      window.removeEventListener('click', handleCloseChapterMenu);
+      window.removeEventListener('contextmenu', handleCloseChapterMenu);
+    };
+  }, []);
 
   // State for Custom Floating Contextual Menu
   const [showSelectionMenu, setShowSelectionMenu] = useState(false);
@@ -155,6 +177,7 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
   };
 
   const handleCardMouseUp = (e: React.MouseEvent, chId: string) => {
+    if (e.button !== 0) return; // Left click only
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -465,6 +488,7 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
       });
 
       onRefresh();
+      setShowMetadataModal(false);
       setActiveSubView('dashboard');
     }
   };
@@ -487,7 +511,7 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
   };
 
   // Handle saving active chapter content
-  const handleSaveActive = () => {
+  const handleSaveActive = async () => {
     if (!activeChapter) return;
     const formattedTitle = capitalizeWords(activeTitle);
     setActiveTitle(formattedTitle);
@@ -502,6 +526,84 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
     storage.updateChapter(updated);
     setIsDirty(false);
     onRefresh();
+
+    // Trigger auto-detect for missing characters and world items
+    if (activeContent && activeContent.trim().length > 10) {
+      setIsAnalyzingNewBible(true);
+      setDetectedNotify(null);
+      try {
+        const existingCharacters = storage.getCharacters(projectId);
+        const existingWorldItems = storage.getWorldItems(projectId);
+
+        const existingCharacterNames = existingCharacters.map(c => c.name);
+        const existingWorldItemNames = existingWorldItems.map(w => w.name);
+
+        const response = await fetch('/api/detect-new-bible-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            draftText: activeContent,
+            existingCharacterNames,
+            existingWorldItemNames,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const { newCharacters = [], newWorldItems = [] } = data;
+
+          const addedCharNames: string[] = [];
+          const addedWorldNames: string[] = [];
+
+          if (newCharacters.length > 0) {
+            newCharacters.forEach((char: any) => {
+              if (char.name && char.name.trim()) {
+                storage.addCharacter(
+                  projectId,
+                  char.name,
+                  char.role || 'Pendukung',
+                  char.description || char.name,
+                  char.backstory || 'Masa lalu misterius.',
+                  char.notes || 'Catatan karakter baru.',
+                  char.aiProfile
+                );
+                addedCharNames.push(capitalizeWords(char.name));
+              }
+            });
+          }
+
+          if (newWorldItems.length > 0) {
+            newWorldItems.forEach((wi: any) => {
+              if (wi.name && wi.name.trim()) {
+                storage.addWorldItem(
+                  projectId,
+                  wi.name,
+                  wi.category || 'Lainnya',
+                  wi.description || wi.name,
+                  wi.notes || 'Catatan dunia baru.',
+                  wi.aiProfile
+                );
+                addedWorldNames.push(capitalizeWords(wi.name));
+              }
+            });
+          }
+
+          if (addedCharNames.length > 0 || addedWorldNames.length > 0) {
+            setDetectedNotify({
+              characters: addedCharNames,
+              worldItems: addedWorldNames,
+            });
+            onRefresh();
+          }
+        }
+      } catch (err) {
+        console.warn('Gagal memproses deteksi bible otomatis:', err);
+      } finally {
+        setIsAnalyzingNewBible(false);
+      }
+    }
   };
 
   // Custom text formatting function for markdown shortcuts
@@ -600,7 +702,7 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
               {/* Edit metadata button - icon only */}
               <button
                 type="button"
-                onClick={() => setActiveSubView('project-metadata')}
+                onClick={() => setShowMetadataModal(true)}
                 className="p-2 bg-neutral-950 text-white hover:bg-neutral-850 rounded-xl transition cursor-pointer shadow-3xs flex items-center justify-center shrink-0"
                 title="Edit Info & Metadata Novel"
                 id="btn-edit-metadata"
@@ -723,6 +825,15 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
                         onMouseDown={(e) => handleCardMouseDown(e, ch.id)}
                         onMouseMove={(e) => handleCardMouseMove(e, ch.id)}
                         onMouseUp={(e) => handleCardMouseUp(e, ch.id)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setChapterContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            chapterId: ch.id
+                          });
+                        }}
                         onTouchStart={(e) => handleCardTouchStart(e, ch.id)}
                         onTouchMove={(e) => handleCardTouchMove(e, ch.id)}
                         onTouchEnd={(e) => handleCardTouchEnd(e, ch.id)}
@@ -747,102 +858,101 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
         </div>
       )}
 
-      {/* 2. PROJECT METADATA EDITOR MODULE */}
-      {activeSubView === 'project-metadata' && (
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-3xs space-y-6 max-w-2xl mx-auto animate-fade-in-down" id="metadata-editor-module">
-          <div className="flex items-center space-x-3 pb-3 border-b border-neutral-100">
-            {/* Back to dashboard button - icon only */}
-            <button
-              type="button"
-              onClick={() => setActiveSubView('dashboard')}
-              className="p-2 border border-neutral-200 hover:bg-neutral-50 rounded-xl text-neutral-600 transition cursor-pointer shadow-3xs"
-              title="Kembali ke Draf"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <div>
-              <span className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase block">
-                Metadata Proyek
-              </span>
-              <h2 className="text-sm font-black uppercase font-montserrat tracking-wider text-neutral-800">
-                PENGATURAN NASKAH FILOSOFI
-              </h2>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveMetadata} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
-                Nama Proyek Novel
-              </label>
-              <input
-                type="text"
-                required
-                value={tempTitle}
-                onChange={(e) => setTempTitle(e.target.value)}
-                placeholder="Misal: Mahakarya Kota Tenggelam..."
-                className="w-full text-xs px-3 py-2 border border-neutral-250 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 font-sans"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
-                  Penulis / Author
-                </label>
-                <input
-                  type="text"
-                  value={tempAuthor}
-                  onChange={(e) => setTempAuthor(e.target.value)}
-                  placeholder="Nama pena atau nama Anda..."
-                  className="w-full text-xs px-3 py-2 border border-neutral-250 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 font-sans"
-                />
+      {/* 2. PROJECT METADATA EDITOR MODULE (Skarang sebagai MODUL POPUP) */}
+      {showMetadataModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs">
+          <div className="w-full max-w-2xl bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-xl space-y-6 animate-scale-up" id="metadata-editor-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <div>
+                <span className="text-[10px] font-bold tracking-widest text-neutral-450 uppercase block">
+                  Metadata Proyek
+                </span>
+                <h2 className="text-sm font-black uppercase font-montserrat tracking-wider text-neutral-850">
+                  PENGATURAN NASKAH FILOSOFI
+                </h2>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
-                  Tags Genre (Pisahkan dengan koma)
-                </label>
-                <input
-                  type="text"
-                  value={tempGenres}
-                  onChange={(e) => setTempGenres(e.target.value)}
-                  placeholder="Aksi, Fantasi, Romansa, Thriller..."
-                  className="w-full text-xs px-3 py-2 border border-neutral-250 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 font-sans"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
-                Sinopsis Cerita Novel Utama
-              </label>
-              <textarea
-                value={tempSynopsis}
-                onChange={(e) => setTempSynopsis(e.target.value)}
-                placeholder="Petakan klimaks, premise, motif protagonist dan alur dasar novel Anda..."
-                rows={6}
-                className="w-full text-xs p-3 border border-neutral-255 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 leading-relaxed font-sans resize-none"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4 border-t border-neutral-100">
               <button
                 type="button"
-                onClick={() => setActiveSubView('dashboard')}
-                className="px-4 py-2 text-xs font-semibold text-neutral-500 hover:bg-neutral-50 border border-neutral-200 rounded-xl transition cursor-pointer"
+                onClick={() => setShowMetadataModal(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition cursor-pointer"
               >
-                Batal
-              </button>
-              {/* Highly visible save metadata button */}
-              <button
-                type="submit"
-                className="px-4 py-2 text-xs font-semibold text-white bg-neutral-950 hover:bg-neutral-850 rounded-xl transition cursor-pointer shadow-3xs"
-              >
-                Simpan Metadata
+                <X className="w-5 h-5 font-bold" />
               </button>
             </div>
-          </form>
+
+            <form onSubmit={handleSaveMetadata} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
+                  Nama Proyek Novel
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={tempTitle}
+                  onChange={(e) => setTempTitle(e.target.value)}
+                  placeholder="Misal: Mahakarya Kota Tenggelam..."
+                  className="w-full text-xs px-3 py-2 border border-neutral-250 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 font-sans"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Penulis / Author
+                  </label>
+                  <input
+                    type="text"
+                    value={tempAuthor}
+                    onChange={(e) => setTempAuthor(e.target.value)}
+                    placeholder="Nama pena atau nama Anda..."
+                    className="w-full text-xs px-3 py-2 border border-neutral-250 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 font-sans"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Tags Genre (Pisahkan dengan koma)
+                  </label>
+                  <input
+                    type="text"
+                    value={tempGenres}
+                    onChange={(e) => setTempGenres(e.target.value)}
+                    placeholder="Aksi, Fantasi, Romansa, Thriller..."
+                    className="w-full text-xs px-3 py-2 border border-neutral-250 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
+                  Sinopsis Cerita Novel Utama
+                </label>
+                <textarea
+                  value={tempSynopsis}
+                  onChange={(e) => setTempSynopsis(e.target.value)}
+                  placeholder="Petakan klimaks, premise, motif protagonist dan alur dasar novel Anda..."
+                  rows={6}
+                  className="w-full text-xs p-3 border border-neutral-255 bg-white rounded-xl focus:outline-hidden focus:border-neutral-900 leading-relaxed font-sans resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setShowMetadataModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-neutral-500 hover:bg-neutral-50 border border-neutral-200 rounded-xl transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-neutral-950 hover:bg-neutral-850 rounded-xl transition cursor-pointer shadow-3xs"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1010,6 +1120,52 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
               placeholder="Tuliskan 1-3 poin kunci bab ini (Misal: Cassandra menyusup ke perpustakaan agung kota di malam hari, diam-diam mencari catatan sejarah legiun ke-5...)"
             />
           </div>
+
+          {/* Auto-add Bible Analysis Progress and Success Banner */}
+          {isAnalyzingNewBible && (
+            <div className="flex items-center space-x-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl p-3 animate-pulse">
+              <div className="w-2 h-2 rounded-full bg-neutral-900 animate-ping" />
+              <span className="text-[11px] font-medium text-neutral-600 font-sans tracking-wide">
+                Membaca naskah... Melacak nama karakter & unsur dunia baru secara otomatis ke Bible...
+              </span>
+            </div>
+          )}
+
+          {detectedNotify && (
+            <motion.div 
+              initial={{ opacity: 0, y: -5 }} 
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-2 text-xs relative"
+            >
+              <button 
+                onClick={() => setDetectedNotify(null)} 
+                className="absolute top-2.5 right-2.5 text-emerald-500 hover:text-emerald-700 cursor-pointer"
+                title="Tutup Notifikasi"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex items-center space-x-1.5 text-emerald-800 font-extrabold font-sans uppercase tracking-widest text-[10px]">
+                <span>✨ Entitas Baru Otomatis Ditambahkan ke Bible</span>
+              </div>
+              <p className="text-emerald-600 font-sans leading-relaxed text-[11px]">
+                Gemini AI mendeteksi nama baru berikut dalam draf saat disimpan dan mendaftarkannya otomatis ke sistem Bible proyek dengan profil & aturan semesta lengkap!
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1 font-sans text-[10px]">
+                {detectedNotify.characters.length > 0 && (
+                  <div className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1">
+                    <span className="font-extrabold text-emerald-900">Karakter Baru:</span>
+                    <span>{detectedNotify.characters.join(', ')}</span>
+                  </div>
+                )}
+                {detectedNotify.worldItems.length > 0 && (
+                  <div className="bg-emerald-105 text-emerald-800 px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1 font-sans">
+                    <span className="font-extrabold text-emerald-900">Mitos/Dunia Baru:</span>
+                    <span>{detectedNotify.worldItems.join(', ')}</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Workspace Area: Draft Canvas & Word Count */}
           <div className="flex-1 flex flex-col justify-stretch">
@@ -1310,6 +1466,77 @@ export default function ChapterEditor({ projectId, chapters, onRefresh }: Chapte
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* Chapter Cards Context Menu */}
+      {chapterContextMenu && (
+        <div
+          id="chapter-card-context-menu"
+          className="fixed z-50 bg-white border border-neutral-200/90 rounded-xl shadow-lg p-1.5 w-48 animate-scale-up font-sans"
+          style={{
+            left: `${Math.max(10, Math.min(window.innerWidth - 202, chapterContextMenu.x))}px`,
+            top: `${Math.max(10, Math.min(window.innerHeight - 170, chapterContextMenu.y))}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedChapterId(chapterContextMenu.chapterId);
+              setActiveSubView('editor');
+              setEditorMode('edit');
+              setChapterContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+          >
+            <Edit className="w-3.5 h-3.5 text-neutral-500" />
+            <span>Tulis & Edit Bab</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedChapterId(chapterContextMenu.chapterId);
+              setActiveSubView('editor');
+              setEditorMode('preview');
+              setChapterContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+          >
+            <Eye className="w-3.5 h-3.5 text-neutral-500" />
+            <span>Pratinjau Buku</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const id = chapterContextMenu.chapterId;
+              navigator.clipboard.writeText(id).then(() => {
+                setCopiedChapterId(id);
+                setTimeout(() => setCopiedChapterId(null), 1250);
+              });
+              setChapterContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+          >
+            <Copy className="w-3.5 h-3.5 text-neutral-500" />
+            <span>{copiedChapterId === chapterContextMenu.chapterId ? 'Tersalin!' : 'Salin ID Chapter'}</span>
+          </button>
+
+          <div className="h-px bg-neutral-100 my-1" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteChapterId(chapterContextMenu.chapterId);
+              setChapterContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition text-left cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+            <span>Hapus Chapter</span>
+          </button>
         </div>
       )}
     </div>

@@ -18,7 +18,7 @@ import { auth, db } from './utils/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.0.9';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -217,7 +217,7 @@ export default function App() {
     >
       {/* Top Navigation Frame Header */}
       <header className="bg-white border-b border-neutral-200/80 sticky top-0 z-40 px-4 h-14 flex items-center shrink-0 shadow-3xs">
-        <div className="max-w-7xl mx-auto flex items-center justify-between w-full">
+        <div className="max-w-8xl mx-auto flex items-center justify-between w-full">
           <div className="flex items-center space-x-2 min-w-0">
             {currentProjectId ? (
               <button
@@ -297,7 +297,7 @@ export default function App() {
       </header>
 
       {/* Main Container Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-6">
+      <main className="flex-1 max-w-8xl w-full mx-auto px-4 md:px-6 py-6">
         <AnimatePresence mode="wait">
           {!currentProjectId ? (
             /* Catalog Section */
@@ -325,79 +325,162 @@ export default function App() {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              {/* Internal responsive navigation bar tabs scoped to selected project */}
-              <div className="border-b border-neutral-200 pb-3" id="project-workspace-navigation">
-                <div className="grid grid-cols-3 gap-2 w-full sm:max-w-md p-0.5" id="project-nav-tabs">
-                  <button
-                    type="button"
-                    onClick={() => setActiveWidget('chapters')}
-                    className={`h-10 text-xs font-extrabold uppercase tracking-widest transition cursor-pointer rounded-xl flex items-center justify-center ${
-                      activeWidget === 'chapters'
-                        ? 'bg-neutral-950 text-white shadow-3xs'
-                        : 'bg-white text-neutral-450 hover:text-neutral-800 border border-neutral-200/80'
-                    }`}
-                    title="Buka Draf Naskah Bab"
-                  >
-                    DRAF
-                  </button>
+              <div className="flex flex-col md:flex-row gap-6 items-start">
+                {/* PROJECT SIDEBAR: Desktop only (always appears inside the opened project) */}
+                <aside className="hidden md:flex flex-col w-60 shrink-0 bg-white border border-neutral-200/85 rounded-2xl p-4.5 shadow-3xs space-y-5 sticky top-20" id="project-desktop-sidebar">
+                  <div className="border-b border-neutral-100 pb-3">
+                    <span className="text-[10px] font-bold tracking-widest text-neutral-400 uppercase block mb-1">
+                      KONSOL PROYEK
+                    </span>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-neutral-850 font-montserrat truncate">
+                      {activeProject?.title || 'Draft Workspace'}
+                    </h3>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveWidget('bible')}
-                    className={`h-10 text-xs font-extrabold uppercase tracking-widest transition cursor-pointer rounded-xl flex items-center justify-center ${
-                      activeWidget === 'bible'
-                        ? 'bg-neutral-950 text-white shadow-3xs'
-                        : 'bg-white text-neutral-455 hover:text-neutral-800 border border-neutral-200/80'
-                    }`}
-                    title="Buka Bible Karakter & Dunia"
-                  >
-                    BIBLE
-                  </button>
+                  <nav className="flex flex-col space-y-1.5" id="project-sidebar-navigation-list">
+                    <button
+                      type="button"
+                      onClick={() => setActiveWidget('chapters')}
+                      className={`w-full flex items-center space-x-3 px-4.5 py-3 text-xs font-bold uppercase tracking-widest transition cursor-pointer rounded-xl text-left ${
+                        activeWidget === 'chapters'
+                          ? 'bg-neutral-950 text-white shadow-3xs'
+                          : 'bg-white text-neutral-450 hover:bg-neutral-50 hover:text-neutral-800 border border-neutral-150'
+                      }`}
+                      title="Buka Draf Naskah Bab"
+                    >
+                      <BookOpen className="w-4 h-4 shrink-0 text-neutral-400 group-hover:text-neutral-600" />
+                      <span>DRAF</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveWidget('plotholes')}
-                    className={`h-10 text-xs font-extrabold uppercase tracking-widest transition cursor-pointer rounded-xl flex items-center justify-center ${
-                      activeWidget === 'plotholes'
-                        ? 'bg-neutral-950 text-white shadow-3xs'
-                        : 'bg-white text-neutral-455 hover:text-neutral-800 border border-neutral-200/80'
-                    }`}
-                    title="Buka Detektor Plot Hole"
-                  >
-                    PLOT
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveWidget('bible')}
+                      className={`w-full flex items-center space-x-3 px-4.5 py-3 text-xs font-bold uppercase tracking-widest transition cursor-pointer rounded-xl text-left ${
+                        activeWidget === 'bible'
+                          ? 'bg-neutral-950 text-white shadow-3xs'
+                          : 'bg-white text-neutral-455 hover:bg-neutral-50 hover:text-neutral-800 border border-neutral-150'
+                      }`}
+                      title="Buka Bible Karakter & Dunia"
+                    >
+                      <Library className="w-4 h-4 shrink-0 text-neutral-400 group-hover:text-neutral-600" />
+                      <span>BIBLE</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveWidget('plotholes')}
+                      className={`w-full flex items-center space-x-3 px-4.5 py-3 text-xs font-bold uppercase tracking-widest transition cursor-pointer rounded-xl text-left ${
+                        activeWidget === 'plotholes'
+                          ? 'bg-neutral-950 text-white shadow-3xs'
+                          : 'bg-white text-neutral-455 hover:bg-neutral-50 hover:text-neutral-800 border border-neutral-150'
+                      }`}
+                      title="Buka Detektor Plot Hole"
+                    >
+                      <CheckSquare className="w-4 h-4 shrink-0 text-neutral-400 group-hover:text-neutral-600" />
+                      <span>PLOT</span>
+                    </button>
+                  </nav>
+
+                  <div className="bg-neutral-50/50 rounded-xl p-3.5 border border-neutral-100 text-[10px] space-y-2.5 font-sans text-neutral-500">
+                    <div className="flex justify-between items-center">
+                      <span className="font-extrabold uppercase tracking-wider text-[9px] text-neutral-400">INFO STATUS KARYA</span>
+                      <span className="bg-neutral-200/60 text-neutral-700 px-1.5 py-0.5 rounded-md font-bold text-[8px]">AKTIF</span>
+                    </div>
+                    <div className="h-px bg-neutral-200/40" />
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span>Total Bab:</span>
+                        <span className="font-bold text-neutral-800">{chapters.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Karakter Alur:</span>
+                        <span className="font-bold text-neutral-800">{characters.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Deteksi Plot Hole:</span>
+                        <span className="font-bold text-neutral-800">{plotHoles.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+
+                {/* MAIN CONTENT AREA: Flexible layout */}
+                <div className="flex-1 w-full space-y-6">
+                  {/* Internal responsive navigation bar tabs scoped to selected project (Mobile / Non-desktop only) */}
+                  <div className="md:hidden border-b border-neutral-200 pb-3" id="project-workspace-navigation">
+                    <div className="grid grid-cols-3 gap-2 w-full sm:max-w-md p-0.5" id="project-nav-tabs">
+                      <button
+                        type="button"
+                        onClick={() => setActiveWidget('chapters')}
+                        className={`h-10 text-xs font-extrabold uppercase tracking-widest transition cursor-pointer rounded-xl flex items-center justify-center ${
+                          activeWidget === 'chapters'
+                            ? 'bg-neutral-950 text-white shadow-3xs'
+                            : 'bg-white text-neutral-450 hover:text-neutral-800 border border-neutral-200/80'
+                        }`}
+                        title="Buka Draf Naskah Bab"
+                      >
+                        DRAF
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveWidget('bible')}
+                        className={`h-10 text-xs font-extrabold uppercase tracking-widest transition cursor-pointer rounded-xl flex items-center justify-center ${
+                          activeWidget === 'bible'
+                            ? 'bg-neutral-950 text-white shadow-3xs'
+                            : 'bg-white text-neutral-455 hover:text-neutral-800 border border-neutral-200/80'
+                        }`}
+                        title="Buka Bible Karakter & Dunia"
+                      >
+                        BIBLE
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveWidget('plotholes')}
+                        className={`h-10 text-xs font-extrabold uppercase tracking-widest transition cursor-pointer rounded-xl flex items-center justify-center ${
+                          activeWidget === 'plotholes'
+                            ? 'bg-neutral-950 text-white shadow-3xs'
+                            : 'bg-white text-neutral-455 hover:text-neutral-800 border border-neutral-200/80'
+                        }`}
+                        title="Buka Detektor Plot Hole"
+                      >
+                        PLOT
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* View Widget Dispatching */}
+                  <div className="min-h-[400px]">
+                    {activeWidget === 'chapters' && (
+                      <ChapterEditor
+                        projectId={currentProjectId}
+                        chapters={chapters}
+                        onRefresh={refreshWorkspace}
+                      />
+                    )}
+
+                    {activeWidget === 'bible' && (
+                      <BibleManager
+                        projectId={currentProjectId}
+                        characters={characters}
+                        worldItems={worldItems}
+                        onRefresh={refreshWorkspace}
+                      />
+                    )}
+
+                    {activeWidget === 'plotholes' && (
+                      <PlotHoleTracker
+                        projectId={currentProjectId}
+                        plotHoles={plotHoles}
+                        chapters={chapters}
+                        characters={characters}
+                        worldItems={worldItems}
+                        onRefresh={refreshWorkspace}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              {/* View Widget Dispatching */}
-              <div className="min-h-[400px]">
-                {activeWidget === 'chapters' && (
-                  <ChapterEditor
-                    projectId={currentProjectId}
-                    chapters={chapters}
-                    onRefresh={refreshWorkspace}
-                  />
-                )}
-
-                {activeWidget === 'bible' && (
-                  <BibleManager
-                    projectId={currentProjectId}
-                    characters={characters}
-                    worldItems={worldItems}
-                    onRefresh={refreshWorkspace}
-                  />
-                )}
-
-                {activeWidget === 'plotholes' && (
-                  <PlotHoleTracker
-                    projectId={currentProjectId}
-                    plotHoles={plotHoles}
-                    chapters={chapters}
-                    characters={characters}
-                    worldItems={worldItems}
-                    onRefresh={refreshWorkspace}
-                  />
-                )}
               </div>
             </motion.div>
           )}
@@ -439,7 +522,7 @@ export default function App() {
       {/* Aesthetic human literal minimal footer - only on main screen */}
       {!currentProjectId && (
         <footer className="py-6 bg-white border-t border-neutral-200/80 mt-12 text-center text-[10px] text-neutral-400 font-sans tracking-wide">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="max-w-8xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <span>Novel Draft Workspace v{APP_VERSION} &copy; 2026. Semua draf tersimpan aman dalam peramban Anda.</span>
             <span className="font-semibold text-neutral-500 uppercase tracking-widest text-[9px] font-montserrat">
               MAHAKARYA ANDA DIMULAI DARI SINI

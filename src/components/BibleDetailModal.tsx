@@ -77,12 +77,27 @@ export default function BibleDetailModal({
         body: JSON.stringify({ character, others }),
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Server error.');
+      let data: any;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const textData = await response.text();
+        try {
+          data = JSON.parse(textData);
+        } catch (e) {
+          throw new Error('Gagal memproses respon dari server (Format JSON tidak valid).');
+        }
+      } else {
+        const textError = await response.text();
+        const cleanError = textError.includes('<!DOCTYPE') || textError.includes('<!doctype')
+          ? `Terjadi kendala teknis (${response.status}). Silakan coba sesaat lagi.`
+          : textError || `Server error: ${response.status}`;
+        throw new Error(cleanError);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Server error.');
+      }
+
       setCharProfile(data);
       
       // Persist to parent context
@@ -112,12 +127,27 @@ export default function BibleDetailModal({
         body: JSON.stringify({ worldItem }),
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Server error.');
+      let data: any;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const textData = await response.text();
+        try {
+          data = JSON.parse(textData);
+        } catch (e) {
+          throw new Error('Gagal memproses respon dari server (Format JSON tidak valid).');
+        }
+      } else {
+        const textError = await response.text();
+        const cleanError = textError.includes('<!DOCTYPE') || textError.includes('<!doctype')
+          ? `Terjadi kendala teknis (${response.status}). Silakan coba sesaat lagi.`
+          : textError || `Server error: ${response.status}`;
+        throw new Error(cleanError);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Server error.');
+      }
+
       setWorldProfile(data);
       
       // Persist to parent context

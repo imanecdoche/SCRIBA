@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { CharacterItem, WorldItem } from '../types';
 import { storage } from '../utils/storage';
-import { Plus, Trash2, Edit2, ShieldAlert, User, Globe, Save, X, BookOpen, UserCheck, Map, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, ShieldAlert, User, Globe, Save, X, BookOpen, UserCheck, Map, ChevronDown, ChevronUp, Sparkles, Loader2, Copy } from 'lucide-react';
 import AppConfirmationModal from './AppConfirmationModal';
 import BibleDetailModal from './BibleDetailModal';
+import CustomSelect, { DropdownOption } from './CustomSelect';
+import AutoAddBibleModal from './AutoAddBibleModal';
 
 interface BibleManagerProps {
   projectId: string;
@@ -19,10 +21,62 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteType, setConfirmDeleteType] = useState<'character' | 'world' | null>(null);
 
+  // Context Menu State for Bible Cards (Characters and World Items)
+  const [bibleContextMenu, setBibleContextMenu] = useState<{
+    x: number;
+    y: number;
+    itemId: string;
+    type: 'character' | 'world';
+    item: any;
+  } | null>(null);
+  const [copiedBibleId, setCopiedBibleId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleCloseBibleMenu = () => {
+      setBibleContextMenu(null);
+    };
+    window.addEventListener('click', handleCloseBibleMenu);
+    window.addEventListener('contextmenu', handleCloseBibleMenu);
+    return () => {
+      window.removeEventListener('click', handleCloseBibleMenu);
+      window.removeEventListener('contextmenu', handleCloseBibleMenu);
+    };
+  }, []);
+
   // Form edit / additions
   const [editingChar, setEditingChar] = useState<Partial<CharacterItem> | null>(null);
   const [editingWorld, setEditingWorld] = useState<Partial<WorldItem> | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+
+  // Auto-add Bible elements states
+  const [isAutoAddOpen, setIsAutoAddOpen] = useState(false);
+  const [autoAddBulk, setAutoAddBulk] = useState(false);
+
+  const handleOpenAutoAdd = (bulkMode: boolean) => {
+    setAutoAddBulk(bulkMode);
+    setIsAutoAddOpen(true);
+  };
+
+  const handleDetectSingle = (data: any) => {
+    if (activeTab === 'characters') {
+      setEditingChar(prev => ({
+        ...prev,
+        name: data.name || prev?.name || '',
+        role: data.role || prev?.role || 'Protagonis',
+        description: data.description || prev?.description || '',
+        backstory: data.backstory || prev?.backstory || '',
+        notes: data.notes || prev?.notes || ''
+      }));
+    } else {
+      setEditingWorld(prev => ({
+        ...prev,
+        name: data.name || prev?.name || '',
+        category: data.category || prev?.category || 'Lokasi',
+        description: data.description || prev?.description || '',
+        notes: data.notes || prev?.notes || ''
+      }));
+    }
+  };
 
   // State to track which items are currently having AI profile auto-generated in background
   const [generatingIds, setGeneratingIds] = useState<Record<string, boolean>>({});
@@ -69,7 +123,14 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
           body: JSON.stringify({ character: item, others: characters }),
         });
         if (response.ok) {
-          const data = await response.json();
+          const textData = await response.text();
+          let data: any;
+          try {
+            data = JSON.parse(textData);
+          } catch (e) {
+            console.warn("Gagal memproses respon latar belakang (Bukan format JSON):", e);
+            return;
+          }
           const withProfile = {
             ...(item as CharacterItem),
             aiProfile: data
@@ -88,7 +149,14 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
           body: JSON.stringify({ worldItem: item }),
         });
         if (response.ok) {
-          const data = await response.json();
+          const textData = await response.text();
+          let data: any;
+          try {
+            data = JSON.parse(textData);
+          } catch (e) {
+            console.warn("Gagal memproses respon latar belakang (Bukan format JSON):", e);
+            return;
+          }
           const withProfile = {
             ...(item as WorldItem),
             aiProfile: data
@@ -259,6 +327,17 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
                     <div
                       key={char.id}
                       onClick={() => openCharDetail(char)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setBibleContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          itemId: char.id,
+                          type: 'character',
+                          item: char
+                        });
+                      }}
                       className="bg-white border border-neutral-200 hover:border-neutral-900 rounded-xl p-4 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer flex items-center justify-between gap-3"
                     >
                       <div className="space-y-1 min-w-0 flex-1">
@@ -314,6 +393,17 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
                   <div
                     key={item.id}
                     onClick={() => openWorldDetail(item)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setBibleContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        itemId: item.id,
+                        type: 'world',
+                        item: item
+                      });
+                    }}
                     className="bg-white border border-neutral-200 hover:border-neutral-900 rounded-xl p-4 shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer flex items-center justify-between gap-3"
                   >
                     <div className="space-y-1 min-w-0 flex-1">
@@ -358,6 +448,18 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
               })}
             </div>
           )}
+
+          {/* Button at the bottom of main activeTab view for Bulk mode */}
+          <div className="flex justify-center pt-4 pb-6">
+            <button
+              type="button"
+              onClick={() => handleOpenAutoAdd(true)}
+              className="w-full max-w-sm px-4 py-2.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl transition flex items-center justify-center space-x-2 cursor-pointer shadow-3xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500 hover:scale-110 transition shrink-0 animate-pulse" />
+              <span>Otomatis Deteksi & Tambah Banyak {activeTab === 'characters' ? 'Karakter' : 'Setting'} (AI)</span>
+            </button>
+          </div>
 
           {/* Floating Action Button (FAB) at Bottom Right */}
           <button
@@ -410,15 +512,11 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
                   <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
                     Peran Narasi
                   </label>
-                  <select
+                  <CustomSelect
                     value={editingChar.role || 'Protagonis'}
-                    onChange={(e) => setEditingChar({ ...editingChar, role: e.target.value })}
-                    className="w-full text-xs px-3 py-2 border border-neutral-200 rounded-xl focus:outline-hidden focus:border-neutral-900 bg-white"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setEditingChar({ ...editingChar, role: val })}
+                    options={ROLES.map((r) => ({ value: r, label: r }))}
+                  />
                 </div>
               </div>
 
@@ -470,6 +568,15 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
                   Urungkan
                 </button>
                 <button
+                  type="button"
+                  onClick={() => handleOpenAutoAdd(false)}
+                  className="px-4 py-2 text-xs font-semibold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl transition flex items-center space-x-1.5 cursor-pointer"
+                  title="Deteksi rincian karakter dari teks mentah Anda lewat AI"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>Isi Otomatis (AI)</span>
+                </button>
+                <button
                   type="submit"
                   className="px-4 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl transition flex items-center space-x-1.5 cursor-pointer"
                 >
@@ -499,15 +606,11 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
                   <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
                     Kategori Setting
                   </label>
-                  <select
+                  <CustomSelect
                     value={editingWorld.category || 'Lokasi'}
-                    onChange={(e) => setEditingWorld({ ...editingWorld, category: e.target.value })}
-                    className="w-full text-xs px-3 py-2 border border-neutral-200 rounded-xl focus:outline-hidden focus:border-neutral-900 bg-white"
-                  >
-                    {WORLD_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setEditingWorld({ ...editingWorld, category: val })}
+                    options={WORLD_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                  />
                 </div>
               </div>
 
@@ -544,6 +647,15 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
                   className="px-4 py-2 text-xs font-semibold text-neutral-500 hover:bg-neutral-50 border border-neutral-100 rounded-xl transition cursor-pointer"
                 >
                   Urungkan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAutoAdd(false)}
+                  className="px-4 py-2 text-xs font-semibold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl transition flex items-center space-x-1.5 cursor-pointer"
+                  title="Deteksi rincian setting dari teks mentah Anda lewat AI"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>Isi Otomatis (AI)</span>
                 </button>
                 <button
                   type="submit"
@@ -587,6 +699,118 @@ export default function BibleManager({ projectId, characters, worldItems, onRefr
           storage.updateWorldItem(updated);
           onRefresh();
         }}
+      />
+
+      {/* Context Menu for Bible Cards */}
+      {bibleContextMenu && (
+        <div
+          id="bible-card-context-menu"
+          className="fixed z-50 bg-white border border-neutral-200/90 rounded-xl shadow-lg p-1.5 w-48 animate-scale-up font-sans"
+          style={{
+            left: `${Math.max(10, Math.min(window.innerWidth - 202, bibleContextMenu.x))}px`,
+            top: `${Math.max(10, Math.min(window.innerHeight - 170, bibleContextMenu.y))}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {bibleContextMenu.type === 'character' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  openCharDetail(bibleContextMenu.item);
+                  setBibleContextMenu(null);
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5 text-neutral-500" />
+                <span>Buka Detail Profil</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingChar(bibleContextMenu.item);
+                  setBibleContextMenu(null);
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-neutral-500" />
+                <span>Ubah Karakter</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  openWorldDetail(bibleContextMenu.item);
+                  setBibleContextMenu(null);
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+              >
+                <Globe className="w-3.5 h-3.5 text-neutral-500" />
+                <span>Buka Detail Aturan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingWorld(bibleContextMenu.item);
+                  setBibleContextMenu(null);
+                }}
+                className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-neutral-500" />
+                <span>Ubah Setting Aturan</span>
+              </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              const id = bibleContextMenu.itemId;
+              navigator.clipboard.writeText(id).then(() => {
+                setCopiedBibleId(id);
+                setTimeout(() => setCopiedBibleId(null), 1250);
+              });
+              setBibleContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+          >
+            <Copy className="w-3.5 h-3.5 text-neutral-500" />
+            <span>{copiedBibleId === bibleContextMenu.itemId ? 'Tersalin!' : 'Salin Kode ID'}</span>
+          </button>
+
+          <div className="h-px bg-neutral-100 my-1" />
+
+          <button
+            type="button"
+            onClick={() => {
+              if (bibleContextMenu.type === 'character') {
+                confirmDeleteCharacter(bibleContextMenu.itemId);
+              } else {
+                confirmDeleteWorld(bibleContextMenu.itemId);
+              }
+              setBibleContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition text-left cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+            <span>Hapus Bible Card</span>
+          </button>
+        </div>
+      )}
+
+      <AutoAddBibleModal
+        isOpen={isAutoAddOpen}
+        onClose={() => setIsAutoAddOpen(false)}
+        type={activeTab === 'characters' ? 'character' : 'world'}
+        bulk={autoAddBulk}
+        projectId={projectId}
+        onRefresh={onRefresh}
+        onDetectSingle={handleDetectSingle}
+        triggerAutomaticAiProfile={triggerAutomaticAiProfile}
       />
     </div>
   );

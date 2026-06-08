@@ -6,6 +6,7 @@ import {
   RefreshCw, CornerDownRight, Milestone, AlertOctagon, X, SearchCheck, CheckCheck 
 } from 'lucide-react';
 import AppConfirmationModal from './AppConfirmationModal';
+import CustomSelect, { DropdownOption } from './CustomSelect';
 
 interface PlotHoleTrackerProps {
   projectId: string;
@@ -15,6 +16,12 @@ interface PlotHoleTrackerProps {
   worldItems: WorldItem[];
   onRefresh: () => void;
 }
+
+const SEVERITY_OPTIONS: DropdownOption[] = [
+  { value: 'low', label: 'Kecil / Low', description: 'Tidak Terlalu Mengganggu' },
+  { value: 'medium', label: 'Sedang / Medium', description: 'Mengganggu Logika' },
+  { value: 'high', label: 'Besar / High', description: 'Merusak Seluruh Alur Cerita' }
+];
 
 export default function PlotHoleTracker({
   projectId,
@@ -335,15 +342,11 @@ export default function PlotHoleTracker({
                 <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
                   Tingkat Kepayahan (Severity)
                 </label>
-                <select
+                <CustomSelect
                   value={editingPlotHole.severity || 'medium'}
-                  onChange={(e) => setEditingPlotHole({ ...editingPlotHole, severity: e.target.value as any })}
-                  className="w-full text-xs px-3 py-2 border border-neutral-200 rounded-xl focus:outline-hidden focus:border-neutral-900 bg-white"
-                >
-                  <option value="low">Kecil / Low (Tidak Terlalu Mengganggu)</option>
-                  <option value="medium">Sedang / Medium (Mengganggu Logika)</option>
-                  <option value="high">Besar / High (Merusak Seluruh Alur Cerita)</option>
-                </select>
+                  onChange={(val) => setEditingPlotHole({ ...editingPlotHole, severity: val as any })}
+                  options={SEVERITY_OPTIONS}
+                />
               </div>
             </div>
 

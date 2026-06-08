@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Project, ProjectType } from '../types';
 import { storage } from '../utils/storage';
-import { Plus, Trash2, BookOpen, Layers, Milestone, AlignLeft, ArrowRight, FolderKanban, Check, Sparkles, Database, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, BookOpen, Layers, Milestone, AlignLeft, ArrowRight, FolderKanban, Check, Sparkles, Database, Loader2, RefreshCw, CheckCircle2, Copy } from 'lucide-react';
 import AppConfirmationModal from './AppConfirmationModal';
 import { auth } from '../utils/firebase';
+import CustomSelect, { DropdownOption } from './CustomSelect';
+
+const PROJECT_TYPE_OPTIONS: DropdownOption[] = [
+  { value: 'solo', label: 'Solo Novel', description: 'Buku Mandiri Tunggal' },
+  { value: 'series', label: 'Series / Duologi / Trilogi', description: 'Multi Buku' },
+  { value: 'mini', label: 'Mini Novel', description: 'Novelet / Cerita Pendek Padat' }
+];
 
 interface ProjectListProps {
   onSelectProject: (projectId: string) => void;
@@ -21,6 +28,22 @@ export default function ProjectList({ onSelectProject, onRefresh, projects, curr
 
   // Deletion Custom Dialog confirmation
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleCloseMenu = () => {
+      setContextMenu(null);
+    };
+    window.addEventListener('click', handleCloseMenu);
+    window.addEventListener('contextmenu', handleCloseMenu);
+    return () => {
+      window.removeEventListener('click', handleCloseMenu);
+      window.removeEventListener('contextmenu', handleCloseMenu);
+    };
+  }, []);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +131,15 @@ export default function ProjectList({ onSelectProject, onRefresh, projects, curr
               <div
                 key={proj.id}
                 onClick={() => onSelectProject(proj.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    projectId: proj.id
+                  });
+                }}
                 className={`group relative flex flex-col justify-between bg-white border rounded-2xl p-5 shadow-3xs cursor-pointer transition ${
                   isActive
                     ? 'border-neutral-950 ring-1 ring-neutral-950'
@@ -208,15 +240,11 @@ export default function ProjectList({ onSelectProject, onRefresh, projects, curr
                 <label className="text-[10px] font-semibold text-neutral-400 uppercase">
                   Kategori Format Proyek
                 </label>
-                <select
+                <CustomSelect
                   value={newType}
-                  onChange={(e) => setNewType(e.target.value as ProjectType)}
-                  className="w-full text-xs px-3 py-2 border border-neutral-200 rounded-xl focus:outline-hidden focus:border-neutral-900 bg-white"
-                >
-                  <option value="solo">Solo Novel (Buku Mandiri Tunggal)</option>
-                  <option value="series">Series / Duologi / Trilogi (Multi Buku)</option>
-                  <option value="mini">Mini Novel (Novelet / Cerita Pendek Padat)</option>
-                </select>
+                  onChange={(val) => setNewType(val as ProjectType)}
+                  options={PROJECT_TYPE_OPTIONS}
+                />
               </div>
 
               <div className="space-y-1">
@@ -260,6 +288,61 @@ export default function ProjectList({ onSelectProject, onRefresh, projects, curr
         onConfirm={executeDelete}
         onCancel={() => setConfirmDeleteId(null)}
       />
+
+      {/* Reusable Context Menu for Project Cards */}
+      {contextMenu && (
+        <div
+          id="project-context-menu"
+          className="fixed z-50 bg-white border border-neutral-200/90 rounded-xl shadow-lg p-1.5 w-48 animate-scale-up font-sans"
+          style={{
+            left: `${Math.max(10, Math.min(window.innerWidth - 202, contextMenu.x))}px`,
+            top: `${Math.max(10, Math.min(window.innerHeight - 130, contextMenu.y))}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onSelectProject(contextMenu.projectId);
+              setContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-neutral-500" />
+            <span>Buka Proyek</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const id = contextMenu.projectId;
+              navigator.clipboard.writeText(id).then(() => {
+                setCopiedId(id);
+                setTimeout(() => setCopiedId(null), 1250);
+              });
+              setContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50 hover:text-neutral-950 rounded-lg transition text-left cursor-pointer"
+          >
+            <Copy className="w-3.5 h-3.5 text-neutral-500" />
+            <span>{copiedId === contextMenu.projectId ? 'Tersalin!' : 'Salin Kode ID'}</span>
+          </button>
+
+          <div className="h-px bg-neutral-100 my-1" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmDeleteId(contextMenu.projectId);
+              setContextMenu(null);
+            }}
+            className="w-full flex items-center space-x-2 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition text-left cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+            <span>Hapus Proyek</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
